@@ -1,29 +1,47 @@
 _base_ = [
-    '../_base_/datasets/SOI_Det.py', '../_base_/schedules/schedule_1x.py',
-    '../_base_/default_runtime.py'
+    '../configs/_base_/datasets/SOI_Det.py', '../configs/_base_/schedules/schedule_1x.py',
+    '../configs/_base_/default_runtime.py'
 ]
-
+custom_imports = dict(imports=['mmcv_custom'], allow_failed_imports=False)
 angle_version = 'le90'
-gpu_number = 6
-fp16 = dict(loss_scale='dynamic')
+# fp16 = dict(loss_scale='dynamic')
 num_classes=26
 source_ratio = [2,1,1]
+pretrained = '/mnt/data/jfu/workspace/SM3Det-main/data/pretrained/BabelRS_ViT-300M.safetensors'
 model = dict(
-    type='TriSourceDetector', 
+    type='TriSourceDetector',
     backbone=dict(
-        type='ConvNeXt_moe_MultiInput',
-        MoE_Block_inds = [[],[],[i*2 for i in range(5)],[0,2]],
-        datasets=None,
-        num_experts= 8, 
-        top_k= 3,
-        arch='tiny',
-        drop_path_rate=0.1,
-        init_cfg=dict(type='Pretrained', prefix='backbone', checkpoint='/mnt/data/jfu/workspace/SM3Det-main/data/pretrained/convnext-tiny.pth')),
+        type='InternViTAdapter',
+        pretrain_size=448,
+        img_size=800,
+        patch_size=16,
+        embed_dim=1024,
+        depth=24,
+        num_heads=16,
+        mlp_ratio=4.0,
+        drop_path_rate=0.,
+        init_values=0.1,
+        with_cp=True,
+        use_flash_attn=False,
+        qk_normalization=False,
+        layerscale_force_fp32=False,
+        with_fpn=False,
+        freeze_vit=False,
+        use_final_norm=True,
+        interaction_indexes=[[0, 2], [3, 8], [9, 17], [18, 23]],
+        cffn_ratio=0.25,
+        deform_ratio=0.25,
+        qkv_bias=True,
+        norm_type='layer_norm',
+        pretrained=pretrained,
+        pretrained_type='full',
+        only_feat_out=True
+    ),
     neck=dict(
         type='MultitaskFPN',
-        in_channels=[96, 192, 384, 768],
+        in_channels=[1024, 1024, 1024, 1024],
         out_channels=256,
-        extra_level=1, 
+        extra_level=1,
         add_extra_convs='on_output',
         num_outs=5),
     sar_bbox_head=dict(
@@ -62,9 +80,9 @@ model = dict(
             target_means=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
             target_stds=[1.0, 1.0, 1.0, 1.0, 0.5, 0.5]),
         loss_cls=dict(
-            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
+            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.5),
         loss_bbox=dict(
-            type='SmoothL1Loss', beta=0.1111111111111111, loss_weight=1.0)),
+            type='SmoothL1Loss', beta=0.1111111111111111, loss_weight=1.5)),
     rgb_roi_head=dict(
         type='OrientedStandardRoIHead',
         bbox_roi_extractor=dict(
@@ -92,8 +110,8 @@ model = dict(
                 target_stds=(0.1, 0.1, 0.2, 0.2, 0.1)),
             reg_class_agnostic=True,
             loss_cls=dict(
-                type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-            loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0))),
+                type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.5),
+            loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.5))),
     ifr_rpn_head=dict(
         type='OrientedRPNHead',
         in_channels=256,
@@ -161,7 +179,6 @@ model = dict(
                 neg_iou_thr=0.3,
                 min_pos_iou=0.3,
                 match_low_quality=True,
-                gpu_assign_thr=600,
                 ignore_iof_thr=-1),
             sampler=dict(
                 type='RandomSampler',
@@ -184,7 +201,6 @@ model = dict(
                 neg_iou_thr=0.5,
                 min_pos_iou=0.5,
                 match_low_quality=False,
-                gpu_assign_thr=600,
                 iou_calculator=dict(type='RBboxOverlaps2D'),
                 ignore_iof_thr=-1),
             sampler=dict(
@@ -215,7 +231,6 @@ model = dict(
                 neg_iou_thr=0.3,
                 min_pos_iou=0.3,
                 match_low_quality=True,
-                gpu_assign_thr=600,
                 ignore_iof_thr=-1),
             sampler=dict(
                 type='RandomSampler',
@@ -238,7 +253,6 @@ model = dict(
                 neg_iou_thr=0.5,
                 min_pos_iou=0.5,
                 match_low_quality=False,
-                gpu_assign_thr=600,
                 iou_calculator=dict(type='RBboxOverlaps2D'),
                 ignore_iof_thr=-1),
             sampler=dict(
@@ -266,21 +280,14 @@ model = dict(
 optimizer = dict(
     _delete_=True,
     type='AdamW',
-    lr=0.0001, #/8*gpu_number,
+    lr=5e-5,
     betas=(0.9, 0.999),
     weight_decay=0.05,
+    constructor='InternViTAdapterLayerDecayOptimizerConstructor',
     paramwise_cfg=dict(
-        custom_keys={
-            'sar_bbox_head': dict(lr_mult=1.),
-            'rgb_rpn_head': dict(lr_mult=1.),
-            'rgb_roi_head': dict(lr_mult=1.),
-            'ifr_rpn_head': dict(lr_mult=1.),
-            'ifr_roi_head': dict(lr_mult=1.),
-            'backbone': dict(lr_mult=1.),
-            'neck': dict(lr_mult=1.),
-        })
+        num_layers=24,
+        layer_decay_rate=0.95 )
     )
-
 
 total_images = 46260+25028 + 17990# 24358
 gpus = 6
@@ -288,26 +295,21 @@ batch_size = sum(source_ratio)
 # evaluation
 
 evaluation = dict(interval=total_images//(batch_size*gpus), metric='bbox',classwise=True)
-evaluation2 = dict(interval=total_images//(batch_size*gpus), metric='mAP') 
-evaluation3 = dict(interval=total_images//(batch_size*gpus), metric='mAP') 
-
-# learning policy
+evaluation2 = dict(interval=total_images//(batch_size*gpus)*4, metric='mAP')
+evaluation3 = dict(interval=total_images//(batch_size*gpus)*4, metric='mAP')
 lr_config = dict(
-    policy='dynamic',
+    policy='step',
     warmup='linear',
-    extra_args = {'T':3, 'b':0.4, 'ema': 0.001, 'backbone_policy':'sigmoid_kl', 'head_policy':'normal'},
-    reweight_losses={'sar_loss_cls':'sar_bbox_head','sar_loss_bbox':'sar_bbox_head','sar_loss_dfl':'sar_bbox_head',
-    'rgb_loss_rpn_cls':'rgb_rpn_head', 'rgb_loss_rpn_bbox':'rgb_rpn_head', 'rgb_loss_cls':'rgb_roi_head','rgb_loss_bbox':'rgb_roi_head',
-    'ifr_loss_rpn_cls':'ifr_rpn_head','ifr_loss_rpn_bbox':'ifr_rpn_head','ifr_loss_cls':'ifr_roi_head','ifr_loss_bbox':'ifr_roi_head'},
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
     step=[total_images//(batch_size*gpus)*8, total_images//(batch_size*gpus)*11])
+
 runner = dict(_delete_=True, type='IterBasedRunner', max_iters=total_images//(batch_size*gpus)*12)
 checkpoint_config = dict(interval=total_images//(batch_size*gpus))
 
-
+log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])
 data = dict(
     samples_per_gpu=batch_size,
-    train_dataloader = dict(multi_datasets=True,
-        source_ratio=source_ratio)
+    train_dataloader = dict(multi_datasets=True, source_ratio=source_ratio)
 )
+data['test'] = data['val']

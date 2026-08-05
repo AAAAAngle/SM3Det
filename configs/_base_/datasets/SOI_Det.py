@@ -2,7 +2,7 @@
 dataset_type1 = 'SARDet_hbb_trisource'
 dataset_type2 = 'SARDetDotaIFRedDataset'
 dataset_type3 = 'SARDetDotaIFRedDataset'
-data_root = 'data/SOI_Det/'
+data_root = '/mnt/data/jfu/workspace/SM3Det-main/data/SOI_Det/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 
@@ -201,4 +201,3 @@ data = dict(
         workers_per_gpu=2,)
     )
 
-    

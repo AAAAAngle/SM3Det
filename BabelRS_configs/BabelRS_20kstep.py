@@ -2,11 +2,12 @@ _base_ = [
     '../configs/_base_/datasets/SOI_Det.py', '../configs/_base_/schedules/schedule_1x.py',
     '../configs/_base_/default_runtime.py'
 ]
+custom_imports = dict(imports=['mmcv_custom'], allow_failed_imports=False)
 angle_version = 'le90'
 # fp16 = dict(loss_scale='dynamic') 
 num_classes=26
 source_ratio = [2,1,1]
-pretrained = '/pretrained/BabelRS_ViT-300M.safetensors'
+pretrained = '/mnt/data/jfu/workspace/SM3Det-main/data/pretrained/BabelRS_ViT-300M.safetensors'
 model = dict(
     type='TriSourceDetector', 
     backbone=dict(
@@ -289,7 +290,7 @@ optimizer = dict(
     )
 
 total_images = 46260+25028 + 17990# 24358
-gpus = 8
+gpus = 6
 batch_size = sum(source_ratio)
 # evaluation
 

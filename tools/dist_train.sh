@@ -6,7 +6,10 @@ NNODES=${NNODES:-1}
 NODE_RANK=${NODE_RANK:-0}
 PORT=${PORT:-29500}
 MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
+LOG_FILE=${LOG_FILE:-"./work_dirs/latest_train.log"}
 
+mkdir -p "$(dirname "$LOG_FILE")"
+exec > >(tee "$LOG_FILE") 2>&1
 
 PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
 python -m torch.distributed.launch \
